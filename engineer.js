@@ -1,266 +1,109 @@
 "use strict";
 
-/* =========================================================
-   SPA ENGINEER V6
-   Short calls + no overlapping audio + robust buttons
-   ========================================================= */
+/* =========================================
+   SPA RACE ENGINEER
+   Built specifically for your current HTML
+========================================= */
 
-const CONFIG = {
-    defaultPace: "1:47",
-    audioFolder: "audio/",
-    speechFallback: true
+const TARGET_LAPS = {
+    105: "1:45",
+    106: "1:46",
+    107: "1:47",
+    108: "1:48"
 };
 
 
-/* =========================================================
-   PACE
-   ========================================================= */
-
-const PACE_PROFILES = {
-    "1:45": {
-        seconds: 105,
-        multiplier: 1
-    },
-
-    "1:46": {
-        seconds: 106,
-        multiplier: 106 / 105
-    },
-
-    "1:47": {
-        seconds: 107,
-        multiplier: 107 / 105
-    },
-
-    "1:48": {
-        seconds: 108,
-        multiplier: 108 / 105
-    }
-};
-
-
-/* =========================================================
-   ENGINEER CALLS
-   ========================================================= */
+/* =========================================
+   SPA CORNER CALLS
+========================================= */
 
 const CORNERS = [
-
-    [1, 18.0, "turn-1.mp3",
-        "Brake straight. Late apex. Early throttle."],
-
-    [2, 22.2, "turn-2.mp3",
-        "Tight left. Prepare right."],
-
-    [3, 25.0, "turn-3.mp3",
-        "Trail brake. Late apex. Power."],
-
-    [4, 28.2, "turn-4.mp3",
-        "Smooth left. Late apex."],
-
-    [5, 31.2, "turn-5.mp3",
-        "Carry speed. Early throttle."],
-
-    [6, 34.8, "turn-6.mp3",
-        "Light brake. Late apex."],
-
-    [7, 38.0, "turn-7.mp3",
-        "Stay tight. Early power."],
-
-    [8, 42.0, "turn-8.mp3",
-        "Brake straight. Late apex."],
-
-    [9, 45.0, "turn-9.mp3",
-        "Sacrifice entry. Maximize exit."],
-
-    [10, 50.0, "turn-10.mp3",
-        "Hard brake. Rotate. Power."],
-
-    [11, 53.0, "turn-11.mp3",
-        "Short brake. Carry speed."],
-
-    [12, 56.5, "turn-12.mp3",
-        "Don't over-slow. Early power."],
-
-    [13, 60.0, "turn-13.mp3",
-        "Late apex. Build throttle."],
-
-    [14, 64.0, "turn-14.mp3",
-        "Light brake. Patient rotation."],
-
-    [15, 68.0, "turn-15.mp3",
-        "Late apex. Get straight."],
-
-    [16, 73.0, "turn-16.mp3",
-        "Brake straight. Rotate. Exit."],
-
-    [17, 76.5, "turn-17.mp3",
-        "Carry speed. Stay smooth."],
-
-    [18, 82.0, "turn-18.mp3",
-        "Commit. Controlled throttle."],
-
-    [19, 86.0, "turn-19.mp3",
-        "Late apex. Full throttle."]
+    [1, 18.0, "Brake straight. Late apex. Early throttle."],
+    [2, 22.2, "Tight left. Prepare right."],
+    [3, 25.0, "Trail brake. Late apex. Power."],
+    [4, 28.2, "Smooth left. Late apex."],
+    [5, 31.2, "Carry speed. Early throttle."],
+    [6, 34.8, "Light brake. Late apex."],
+    [7, 38.0, "Stay tight. Early power."],
+    [8, 42.0, "Brake straight. Late apex."],
+    [9, 45.0, "Sacrifice entry. Maximize exit."],
+    [10, 50.0, "Hard brake. Rotate. Power."],
+    [11, 53.0, "Short brake. Carry speed."],
+    [12, 56.5, "Don't over-slow. Early power."],
+    [13, 60.0, "Late apex. Build throttle."],
+    [14, 64.0, "Light brake. Patient rotation."],
+    [15, 68.0, "Late apex. Get straight."],
+    [16, 73.0, "Brake straight. Rotate. Exit."],
+    [17, 76.5, "Carry speed. Stay smooth."],
+    [18, 82.0, "Commit. Controlled throttle."],
+    [19, 86.0, "Late apex. Full throttle."]
 ];
 
 
-/* =========================================================
+/* =========================================
    STATE
-   ========================================================= */
+========================================= */
+
+let lapLength = 105;
 
 let running = false;
-let elapsed = 0;
+
 let startTime = 0;
-let currentLap = 1;
-let selectedPace = CONFIG.defaultPace;
+
+let elapsed = 0;
+
 let animationFrame = null;
 
-let triggeredCorners = new Set();
+let currentCorner = 0;
 
-let audioQueue = [];
-let audioPlaying = false;
-let currentAudio = null;
+let voiceBusy = false;
 
-
-/* =========================================================
-   FIND ELEMENT
-   ========================================================= */
-
-function findElement(...selectors) {
-
-    for (const selector of selectors) {
-
-        const element =
-            document.querySelector(selector);
-
-        if (element) return element;
-    }
-
-    return null;
-}
+let voiceQueue = [];
 
 
-/* =========================================================
-   FIND BUTTON BY TEXT
-   ========================================================= */
+/* =========================================
+   HTML ELEMENTS
+========================================= */
 
-function findButtonByText(words) {
+const status =
+    document.getElementById("status");
 
-    const buttons =
-        document.querySelectorAll(
-            "button, input[type='button'], input[type='submit']"
-        );
+const target =
+    document.getElementById("target");
 
-    for (const button of buttons) {
+const call =
+    document.getElementById("call");
 
-        const text =
-            (
-                button.textContent ||
-                button.value ||
-                ""
-            )
-            .trim()
-            .toLowerCase();
+const next =
+    document.getElementById("next");
 
-        for (const word of words) {
+const lap =
+    document.getElementById("lap");
 
-            if (text.includes(word)) {
-                return button;
-            }
-        }
-    }
+const count =
+    document.getElementById("count");
 
-    return null;
-}
-
-
-/* =========================================================
-   UI ELEMENTS
-   ========================================================= */
-
-const timerDisplay = findElement(
-    "#timer",
-    "#lapTimer",
-    "#time",
-    ".timer"
-);
-
-const lapDisplay = findElement(
-    "#lap",
-    "#lapNumber",
-    ".lap"
-);
-
-const paceDisplay = findElement(
-    "#pace",
-    "#lapPace",
-    ".pace"
-);
-
-const cornerDisplay = findElement(
-    "#corner",
-    "#currentCorner",
-    ".corner"
-);
-
-const callDisplay = findElement(
-    "#call",
-    "#engineerCall",
-    ".call"
-);
-
-const statusDisplay = findElement(
-    "#status",
-    ".status"
-);
+const corner =
+    document.getElementById("corner");
 
 const startButton =
-    findElement(
-        "#start",
-        "#startBtn",
-        "#startButton",
-        "[data-action='start']"
-    ) ||
-    findButtonByText([
-        "start",
-        "begin",
-        "go"
-    ]);
+    document.getElementById("start");
 
 const stopButton =
-    findElement(
-        "#stop",
-        "#stopBtn",
-        "#stopButton",
-        "[data-action='stop']"
-    ) ||
-    findButtonByText([
-        "stop",
-        "pause"
-    ]);
+    document.getElementById("stop");
 
-const resetButton =
-    findElement(
-        "#reset",
-        "#resetBtn",
-        "#resetButton",
-        "[data-action='reset']"
-    ) ||
-    findButtonByText([
-        "reset"
-    ]);
+const testButton =
+    document.getElementById("test");
 
-const paceSelect = findElement(
-    "#paceSelect",
-    "#paceSelector",
-    "#lapSelect",
-    "select[name='pace']"
-);
+const paceButtons =
+    document.querySelectorAll(
+        "[data-lap]"
+    );
 
 
-/* =========================================================
-   DISPLAY
-   ========================================================= */
+/* =========================================
+   DISPLAY TIME
+========================================= */
 
 function formatTime(seconds) {
 
@@ -270,264 +113,155 @@ function formatTime(seconds) {
     const secs =
         Math.floor(seconds % 60);
 
-    const hundredths =
+    const tenths =
         Math.floor(
-            (seconds % 1) * 100
+            (seconds % 1) * 10
         );
 
     return (
-        String(minutes).padStart(2, "0") +
+        minutes +
         ":" +
         String(secs).padStart(2, "0") +
         "." +
-        String(hundredths).padStart(2, "0")
+        tenths
     );
 }
 
 
-function updateDisplay() {
+/* =========================================
+   UPDATE TIMER
+========================================= */
 
-    if (timerDisplay) {
-        timerDisplay.textContent =
-            formatTime(elapsed);
-    }
+function updateTimer() {
 
-    if (lapDisplay) {
-        lapDisplay.textContent =
-            `LAP ${currentLap}`;
-    }
+    lap.textContent =
+        formatTime(elapsed);
 
-    if (paceDisplay) {
-        paceDisplay.textContent =
-            selectedPace;
-    }
 }
 
 
-function updateCall(text) {
+/* =========================================
+   FIND NEXT CORNER
+========================================= */
 
-    if (!callDisplay) return;
+function getNextCorner() {
 
-    callDisplay.textContent = text;
+    for (
+        let i = 0;
+        i < CORNERS.length;
+        i++
+    ) {
 
-    callDisplay.classList.remove("active");
+        const cornerTime =
+            CORNERS[i][1] *
+            (lapLength / 105);
 
-    void callDisplay.offsetWidth;
+        if (
+            cornerTime > elapsed
+        ) {
 
-    callDisplay.classList.add("active");
-}
+            return {
+                index: i,
+                number: CORNERS[i][0],
+                time: cornerTime,
+                text: CORNERS[i][2]
+            };
 
-
-function updateStatus(text) {
-
-    if (statusDisplay) {
-        statusDisplay.textContent = text;
-    }
-}
-
-
-function updateCorner(number) {
-
-    if (!cornerDisplay) return;
-
-    if (!number) {
-
-        cornerDisplay.textContent = "—";
-
-        return;
-    }
-
-    cornerDisplay.textContent =
-        `TURN ${number}`;
-}
-
-
-/* =========================================================
-   AUDIO QUEUE
-   ========================================================= */
-
-function queueCall(text, audioFile = null) {
-
-    audioQueue.push({
-        text,
-        audioFile
-    });
-
-    processQueue();
-}
-
-
-async function processQueue() {
-
-    if (audioPlaying) return;
-
-    if (audioQueue.length === 0) return;
-
-    audioPlaying = true;
-
-    const call =
-        audioQueue.shift();
-
-    updateCall(call.text);
-
-    let played = false;
-
-    if (call.audioFile) {
-
-        played =
-            await playAudio(
-                call.audioFile
-            );
-    }
-
-    if (!played) {
-
-        await speak(
-            call.text
-        );
-    }
-
-    audioPlaying = false;
-
-    currentAudio = null;
-
-    processQueue();
-}
-
-
-/* =========================================================
-   AUDIO FILE
-   ========================================================= */
-
-function playAudio(filename) {
-
-    return new Promise(resolve => {
-
-        const audio =
-            new Audio(
-                CONFIG.audioFolder +
-                filename
-            );
-
-        currentAudio = audio;
-
-        let finished = false;
-
-        function finish(success) {
-
-            if (finished) return;
-
-            finished = true;
-
-            audio.onended = null;
-            audio.onerror = null;
-
-            resolve(success);
         }
+    }
 
-        audio.onended = () => {
-            finish(true);
-        };
-
-        audio.onerror = () => {
-            finish(false);
-        };
-
-        audio.volume = 1;
-
-        audio.play()
-            .catch(() => {
-                finish(false);
-            });
-    });
+    return null;
 }
 
 
-/* =========================================================
-   BROWSER VOICE
-   ========================================================= */
+/* =========================================
+   VOICE QUEUE
+   PREVENTS OVERLAPPING VOICES
+========================================= */
 
 function speak(text) {
 
-    return new Promise(resolve => {
+    voiceQueue.push(text);
 
-        if (
-            !CONFIG.speechFallback ||
-            !("speechSynthesis" in window)
-        ) {
-
-            resolve();
-
-            return;
-        }
-
-        window.speechSynthesis.cancel();
-
-        const voice =
-            new SpeechSynthesisUtterance(
-                text
-            );
-
-        voice.rate = 1.08;
-        voice.pitch = 0.85;
-        voice.volume = 1;
-
-        voice.onend = resolve;
-        voice.onerror = resolve;
-
-        window.speechSynthesis.speak(
-            voice
-        );
-    });
+    processVoiceQueue();
 }
 
 
-/* =========================================================
-   CORNER TIMING
-   ========================================================= */
+function processVoiceQueue() {
 
-function cornerTime(baseTime) {
+    if (voiceBusy) return;
 
-    return (
-        baseTime *
-        PACE_PROFILES[selectedPace]
-            .multiplier
+    if (
+        voiceQueue.length === 0
+    ) return;
+
+    if (
+        !("speechSynthesis" in window)
+    ) return;
+
+    voiceBusy = true;
+
+    const text =
+        voiceQueue.shift();
+
+    const utterance =
+        new SpeechSynthesisUtterance(
+            text
+        );
+
+    utterance.rate = 1.08;
+
+    utterance.pitch = 0.85;
+
+    utterance.volume = 1;
+
+    utterance.onend = function () {
+
+        voiceBusy = false;
+
+        processVoiceQueue();
+
+    };
+
+    utterance.onerror = function () {
+
+        voiceBusy = false;
+
+        processVoiceQueue();
+
+    };
+
+    window.speechSynthesis.speak(
+        utterance
     );
 }
 
 
-function checkCorners() {
+/* =========================================
+   ENGINEER CALL
+========================================= */
 
-    for (const corner of CORNERS) {
+function engineerCall(
+    text,
+    cornerNumber
+) {
 
-        const number = corner[0];
-        const time = corner[1];
-        const audio = corner[2];
-        const text = corner[3];
+    call.textContent =
+        text;
 
-        if (
-            elapsed >= cornerTime(time) &&
-            !triggeredCorners.has(number)
-        ) {
+    corner.textContent =
+        cornerNumber;
 
-            triggeredCorners.add(number);
+    speak(text);
 
-            updateCorner(number);
-
-            queueCall(
-                text,
-                audio
-            );
-        }
-    }
 }
 
 
-/* =========================================================
-   START
-   ========================================================= */
+/* =========================================
+   START LAP
+========================================= */
 
-function startEngineer() {
+function startLap() {
 
     if (running) return;
 
@@ -537,30 +271,28 @@ function startEngineer() {
         performance.now() -
         elapsed * 1000;
 
-    updateStatus(
-        `ENGINEER ACTIVE — ${selectedPace}`
+    status.textContent =
+        "LIVE";
+
+    next.textContent =
+        "Engineer active.";
+
+    speak(
+        "Green light. Push."
     );
-
-    if (elapsed < 0.5) {
-
-        queueCall(
-            "Green light. Push.",
-            "start.mp3"
-        );
-    }
 
     animationFrame =
         requestAnimationFrame(
-            gameLoop
+            loop
         );
 }
 
 
-/* =========================================================
-   STOP
-   ========================================================= */
+/* =========================================
+   STOP LAP
+========================================= */
 
-function stopEngineer() {
+function stopLap() {
 
     running = false;
 
@@ -570,35 +302,32 @@ function stopEngineer() {
 
     animationFrame = null;
 
-    audioQueue = [];
+    status.textContent =
+        "STOPPED";
 
-    if (currentAudio) {
-
-        currentAudio.pause();
-
-        currentAudio.currentTime = 0;
-
-        currentAudio = null;
-    }
-
-    audioPlaying = false;
+    next.textContent =
+        "Press START when you're ready.";
 
     if (
         "speechSynthesis" in window
     ) {
 
         window.speechSynthesis.cancel();
+
     }
 
-    updateStatus("PAUSED");
+    voiceQueue = [];
+
+    voiceBusy = false;
+
 }
 
 
-/* =========================================================
-   RESET
-   ========================================================= */
+/* =========================================
+   RESET LAP
+========================================= */
 
-function resetEngineer() {
+function resetLap() {
 
     running = false;
 
@@ -607,90 +336,48 @@ function resetEngineer() {
     );
 
     animationFrame = null;
-
-    audioQueue = [];
-
-    if (currentAudio) {
-
-        currentAudio.pause();
-
-        currentAudio.currentTime = 0;
-
-        currentAudio = null;
-    }
-
-    audioPlaying = false;
-
-    if (
-        "speechSynthesis" in window
-    ) {
-
-        window.speechSynthesis.cancel();
-    }
 
     elapsed = 0;
 
-    currentLap = 1;
+    currentCorner = 0;
 
-    triggeredCorners.clear();
+    updateTimer();
 
-    updateDisplay();
+    status.textContent =
+        "READY";
 
-    updateCorner(null);
+    call.textContent =
+        "READY";
 
-    updateCall(
-        "ENGINEER READY"
-    );
+    next.textContent =
+        "Press START when you're ready.";
 
-    updateStatus(
-        `READY — ${selectedPace}`
-    );
-}
+    count.textContent =
+        "--";
 
+    corner.textContent =
+        "—";
 
-/* =========================================================
-   LAP FINISH
-   ========================================================= */
+    if (
+        "speechSynthesis" in window
+    ) {
 
-function checkLapFinish() {
+        window.speechSynthesis.cancel();
 
-    const target =
-        PACE_PROFILES[selectedPace]
-            .seconds;
-
-    if (elapsed >= target) {
-
-        running = false;
-
-        cancelAnimationFrame(
-            animationFrame
-        );
-
-        animationFrame = null;
-
-        queueCall(
-            "Lap complete.",
-            "finish.mp3"
-        );
-
-        updateStatus(
-            `LAP ${currentLap} COMPLETE`
-        );
-
-        currentLap++;
-
-        elapsed = 0;
-
-        triggeredCorners.clear();
     }
+
+    voiceQueue = [];
+
+    voiceBusy = false;
+
 }
 
 
-/* =========================================================
+/* =========================================
    MAIN LOOP
-   ========================================================= */
+========================================= */
 
-function gameLoop(timestamp) {
+function loop(timestamp) {
 
     if (!running) return;
 
@@ -700,101 +387,173 @@ function gameLoop(timestamp) {
             startTime
         ) / 1000;
 
-    updateDisplay();
+    updateTimer();
 
-    checkCorners();
+    const upcoming =
+        getNextCorner();
 
-    checkLapFinish();
+    if (upcoming) {
 
-    if (running) {
+        count.textContent =
+            upcoming.number;
 
-        animationFrame =
-            requestAnimationFrame(
-                gameLoop
+        next.textContent =
+            upcoming.text;
+
+        /*
+           Trigger call slightly before
+           the reference point.
+        */
+
+        const triggerTime =
+            upcoming.time - 1.5;
+
+        if (
+            elapsed >= triggerTime &&
+            currentCorner <
+                upcoming.number
+        ) {
+
+            currentCorner =
+                upcoming.number;
+
+            engineerCall(
+                upcoming.text,
+                upcoming.number
             );
+
+        }
+
     }
-}
 
+    /*
+       Lap finished
+    */
 
-/* =========================================================
-   PACE
-   ========================================================= */
+    if (
+        elapsed >= lapLength
+    ) {
 
-function setPace(pace) {
+        running = false;
 
-    if (!PACE_PROFILES[pace]) {
+        status.textContent =
+            "LAP COMPLETE";
+
+        speak(
+            "Lap complete."
+        );
+
+        cancelAnimationFrame(
+            animationFrame
+        );
+
         return;
     }
 
-    selectedPace = pace;
+    animationFrame =
+        requestAnimationFrame(
+            loop
+        );
 
-    updateDisplay();
-
-    updateStatus(
-        running
-            ? `ENGINEER ACTIVE — ${pace}`
-            : `READY — ${pace}`
-    );
 }
 
 
-/* =========================================================
-   BUTTON EVENTS
-   ========================================================= */
+/* =========================================
+   PACE BUTTONS
+========================================= */
 
-if (startButton) {
+paceButtons.forEach(
+    button => {
 
-    startButton.addEventListener(
-        "click",
-        startEngineer
-    );
-}
+        button.addEventListener(
+            "click",
+            () => {
 
-if (stopButton) {
+                lapLength =
+                    Number(
+                        button.dataset.lap
+                    );
 
-    stopButton.addEventListener(
-        "click",
-        stopEngineer
-    );
-}
+                target.textContent =
+                    TARGET_LAPS[
+                        lapLength
+                    ];
 
-if (resetButton) {
+                /*
+                   Highlight selected pace
+                */
 
-    resetButton.addEventListener(
-        "click",
-        resetEngineer
-    );
-}
+                paceButtons.forEach(
+                    b => {
+                        b.classList.remove(
+                            "selected"
+                        );
+                    }
+                );
 
-if (paceSelect) {
+                button.classList.add(
+                    "selected"
+                );
 
-    paceSelect.addEventListener(
-        "change",
-        event => {
+            }
+        );
 
-            setPace(
-                event.target.value
-            );
-        }
-    );
-}
+    }
+);
 
 
-/* =========================================================
-   KEYBOARD
-   ========================================================= */
+/* =========================================
+   START BUTTON
+========================================= */
+
+startButton.addEventListener(
+    "click",
+    startLap
+);
+
+
+/* =========================================
+   STOP BUTTON
+========================================= */
+
+stopButton.addEventListener(
+    "click",
+    stopLap
+);
+
+
+/* =========================================
+   TEST VOICE
+========================================= */
+
+testButton.addEventListener(
+    "click",
+    () => {
+
+        speak(
+            "Engineer voice check. " +
+            "Brake straight. " +
+            "Late apex. " +
+            "Early throttle."
+        );
+
+        call.textContent =
+            "VOICE CHECK";
+
+        status.textContent =
+            "VOICE TEST";
+
+    }
+);
+
+
+/* =========================================
+   KEYBOARD CONTROLS
+========================================= */
 
 document.addEventListener(
     "keydown",
     event => {
-
-        if (
-            event.target.tagName === "INPUT" ||
-            event.target.tagName === "SELECT" ||
-            event.target.tagName === "TEXTAREA"
-        ) {
-            return;
-        }
 
         if (
             event.code === "Space"
@@ -804,90 +563,101 @@ document.addEventListener(
 
             if (running) {
 
-                stopEngineer();
+                stopLap();
 
             } else {
 
-                startEngineer();
+                startLap();
+
             }
+
+        }
+
+        if (
+            event.key === "1"
+        ) {
+
+            document
+                .querySelector(
+                    '[data-lap="105"]'
+                )
+                ?.click();
+
+        }
+
+        if (
+            event.key === "2"
+        ) {
+
+            document
+                .querySelector(
+                    '[data-lap="106"]'
+                )
+                ?.click();
+
+        }
+
+        if (
+            event.key === "3"
+        ) {
+
+            document
+                .querySelector(
+                    '[data-lap="107"]'
+                )
+                ?.click();
+
+        }
+
+        if (
+            event.key === "4"
+        ) {
+
+            document
+                .querySelector(
+                    '[data-lap="108"]'
+                )
+                ?.click();
+
         }
 
         if (
             event.key.toLowerCase() === "r"
         ) {
 
-            resetEngineer();
+            resetLap();
+
         }
 
-        if (event.key === "1") {
-            setPace("1:45");
-        }
-
-        if (event.key === "2") {
-            setPace("1:46");
-        }
-
-        if (event.key === "3") {
-            setPace("1:47");
-        }
-
-        if (event.key === "4") {
-            setPace("1:48");
-        }
     }
 );
 
 
-/* =========================================================
+/* =========================================
    INITIALIZE
-   ========================================================= */
+========================================= */
 
-function initialize() {
+target.textContent =
+    TARGET_LAPS[lapLength];
 
-    updateDisplay();
+lap.textContent =
+    "0:00.0";
 
-    updateCorner(null);
+count.textContent =
+    "--";
 
-    updateCall(
-        "ENGINEER READY"
-    );
+corner.textContent =
+    "—";
 
-    updateStatus(
-        `READY — ${selectedPace}`
-    );
+status.textContent =
+    "READY";
 
-    console.log(
-        "Spa Engineer V6 loaded successfully."
-    );
+call.textContent =
+    "READY";
 
-    console.log(
-        "Start button:",
-        startButton
-    );
+next.textContent =
+    "Press START when you're ready.";
 
-    console.log(
-        "Stop button:",
-        stopButton
-    );
-
-    console.log(
-        "Reset button:",
-        resetButton
-    );
-}
-
-
-if (
-    document.readyState ===
-    "loading"
-) {
-
-    document.addEventListener(
-        "DOMContentLoaded",
-        initialize
-    );
-
-} else {
-
-    initialize();
-}
+console.log(
+    "Spa Race Engineer loaded successfully."
+);
