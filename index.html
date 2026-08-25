@@ -1,82 +1,129 @@
-"use strict";
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta
+        name="viewport"
+        content="width=device-width,initial-scale=1"
+    >
 
-document.addEventListener("DOMContentLoaded", function () {
+    <title>Spa Race Engineer</title>
 
-    const startButton = document.getElementById("start");
-    const stopButton = document.getElementById("stop");
-    const testButton = document.getElementById("test");
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+</head>
 
-    const status = document.getElementById("status");
-    const call = document.getElementById("call");
+<body>
 
-    console.log("ENGINEER.JS LOADED");
+<main>
 
-    console.log("START:", startButton);
-    console.log("STOP:", stopButton);
-    console.log("TEST:", testButton);
+    <header>
+        <div>
+            <small>SPA-FRANCORCHAMPS</small>
+            <h1>RACE ENGINEER</h1>
+        </div>
 
-    if (!startButton || !stopButton || !testButton) {
-        console.error("ONE OR MORE BUTTONS WERE NOT FOUND");
-        return;
-    }
-
-    startButton.addEventListener("click", function () {
-
-        console.log("START BUTTON WORKED");
-
-        status.textContent = "PUSH LAP";
-        call.textContent = "PUSH LAP";
-
-        if ("speechSynthesis" in window) {
-            window.speechSynthesis.cancel();
-
-            const voice =
-                new SpeechSynthesisUtterance(
-                    "Push lap. Build speed."
-                );
-
-            voice.rate = 1.05;
-
-            window.speechSynthesis.speak(voice);
-        }
-
-    });
+        <b id="status">READY</b>
+    </header>
 
 
-    stopButton.addEventListener("click", function () {
+    <section class="hero">
 
-        console.log("STOP BUTTON WORKED");
+        <small>TARGET LAP</small>
 
-        status.textContent = "STOPPED";
-        call.textContent = "STOPPED";
+        <div id="target">1:45</div>
 
-        if ("speechSynthesis" in window) {
-            window.speechSynthesis.cancel();
-        }
+        <div class="paces">
 
-    });
+            <button data-lap="105">
+                1:45
+            </button>
+
+            <button data-lap="106">
+                1:46
+            </button>
+
+            <button data-lap="107">
+                1:47
+            </button>
+
+            <button data-lap="108">
+                1:48
+            </button>
+
+        </div>
+
+    </section>
 
 
-    testButton.addEventListener("click", function () {
+    <section class="call">
 
-        console.log("TEST BUTTON WORKED");
+        <small>ENGINEER</small>
 
-        status.textContent = "VOICE TEST";
-        call.textContent = "VOICE CHECK";
+        <div id="call">READY</div>
 
-        if ("speechSynthesis" in window) {
-            window.speechSynthesis.cancel();
+        <p id="next">
+            Press START when you're ready.
+        </p>
 
-            const voice =
-                new SpeechSynthesisUtterance(
-                    "Engineer voice check."
-                );
+    </section>
 
-            voice.rate = 1.05;
 
-            window.speechSynthesis.speak(voice);
-        }
+    <section class="stats">
 
-    });
+        <div>
+            LAP
+            <strong id="lap">
+                0:00.0
+            </strong>
+        </div>
 
-});
+        <div>
+            NEXT
+            <strong id="count">
+                --
+            </strong>
+        </div>
+
+        <div>
+            CORNER
+            <strong id="corner">
+                —
+            </strong>
+        </div>
+
+    </section>
+
+
+    <div class="controls">
+
+        <button id="start">
+            START LAP
+        </button>
+
+        <button id="stop">
+            STOP
+        </button>
+
+        <button id="test">
+            TEST VOICE
+        </button>
+
+    </div>
+
+
+    <p class="note">
+        Practice reference only.
+        Corner timings should be calibrated
+        against your F1 24 laps.
+    </p>
+
+</main>
+
+
+<script src="engineer.js"></script>
+
+</body>
+</html>
