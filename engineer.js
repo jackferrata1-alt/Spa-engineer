@@ -1,11 +1,11 @@
 "use strict";
 
 /* =========================================
-   SPA RACE ENGINEER
-   Built specifically for your current HTML
+   SPA RACE ENGINEER V7
+   Fixed new-lap reset + voice queue
 ========================================= */
 
-const TARGET_LAPS = {
+const PACE_TIMES = {
     105: "1:45",
     106: "1:46",
     107: "1:47",
@@ -14,7 +14,7 @@ const TARGET_LAPS = {
 
 
 /* =========================================
-   SPA CORNER CALLS
+   CORNER CALLS
 ========================================= */
 
 const CORNERS = [
@@ -48,21 +48,21 @@ let lapLength = 105;
 
 let running = false;
 
-let startTime = 0;
-
 let elapsed = 0;
+
+let startTime = 0;
 
 let animationFrame = null;
 
 let currentCorner = 0;
 
-let voiceBusy = false;
-
 let voiceQueue = [];
+
+let voiceBusy = false;
 
 
 /* =========================================
-   HTML ELEMENTS
+   ELEMENTS
 ========================================= */
 
 const status =
@@ -96,13 +96,11 @@ const testButton =
     document.getElementById("test");
 
 const paceButtons =
-    document.querySelectorAll(
-        "[data-lap]"
-    );
+    document.querySelectorAll("[data-lap]");
 
 
 /* =========================================
-   DISPLAY TIME
+   FORMAT TIME
 ========================================= */
 
 function formatTime(seconds) {
@@ -129,7 +127,7 @@ function formatTime(seconds) {
 
 
 /* =========================================
-   UPDATE TIMER
+   DISPLAY
 ========================================= */
 
 function updateTimer() {
@@ -141,7 +139,99 @@ function updateTimer() {
 
 
 /* =========================================
-   FIND NEXT CORNER
+   CLEAR VOICE
+========================================= */
+
+function clearVoiceQueue() {
+
+    voiceQueue = [];
+
+    voiceBusy = false;
+
+    if (
+        "speechSynthesis" in window
+    ) {
+
+        window.speechSynthesis.cancel();
+
+    }
+}
+
+
+/* =========================================
+   SPEAK
+========================================= */
+
+function speak(text) {
+
+    voiceQueue.push(text);
+
+    processVoiceQueue();
+
+}
+
+
+/* =========================================
+   PROCESS VOICE QUEUE
+========================================= */
+
+function processVoiceQueue() {
+
+    if (voiceBusy) {
+        return;
+    }
+
+    if (voiceQueue.length === 0) {
+        return;
+    }
+
+    if (
+        !("speechSynthesis" in window)
+    ) {
+        voiceQueue = [];
+        return;
+    }
+
+    voiceBusy = true;
+
+    const text =
+        voiceQueue.shift();
+
+    const voice =
+        new SpeechSynthesisUtterance(
+            text
+        );
+
+    voice.rate = 1.08;
+
+    voice.pitch = 0.85;
+
+    voice.volume = 1;
+
+    voice.onend = function () {
+
+        voiceBusy = false;
+
+        processVoiceQueue();
+
+    };
+
+    voice.onerror = function () {
+
+        voiceBusy = false;
+
+        processVoiceQueue();
+
+    };
+
+    window.speechSynthesis.speak(
+        voice
+    );
+}
+
+
+/* =========================================
+   NEXT CORNER
 ========================================= */
 
 function getNextCorner() {
@@ -152,19 +242,25 @@ function getNextCorner() {
         i++
     ) {
 
-        const cornerTime =
-            CORNERS[i][1] *
+        const number =
+            CORNERS[i][0];
+
+        const baseTime =
+            CORNERS[i][1];
+
+        const time =
+            baseTime *
             (lapLength / 105);
 
-        if (
-            cornerTime > elapsed
-        ) {
+        const text =
+            CORNERS[i][2];
+
+        if (time > elapsed) {
 
             return {
-                index: i,
-                number: CORNERS[i][0],
-                time: cornerTime,
-                text: CORNERS[i][2]
+                number,
+                time,
+                text
             };
 
         }
@@ -175,82 +271,19 @@ function getNextCorner() {
 
 
 /* =========================================
-   VOICE QUEUE
-   PREVENTS OVERLAPPING VOICES
-========================================= */
-
-function speak(text) {
-
-    voiceQueue.push(text);
-
-    processVoiceQueue();
-}
-
-
-function processVoiceQueue() {
-
-    if (voiceBusy) return;
-
-    if (
-        voiceQueue.length === 0
-    ) return;
-
-    if (
-        !("speechSynthesis" in window)
-    ) return;
-
-    voiceBusy = true;
-
-    const text =
-        voiceQueue.shift();
-
-    const utterance =
-        new SpeechSynthesisUtterance(
-            text
-        );
-
-    utterance.rate = 1.08;
-
-    utterance.pitch = 0.85;
-
-    utterance.volume = 1;
-
-    utterance.onend = function () {
-
-        voiceBusy = false;
-
-        processVoiceQueue();
-
-    };
-
-    utterance.onerror = function () {
-
-        voiceBusy = false;
-
-        processVoiceQueue();
-
-    };
-
-    window.speechSynthesis.speak(
-        utterance
-    );
-}
-
-
-/* =========================================
    ENGINEER CALL
 ========================================= */
 
 function engineerCall(
     text,
-    cornerNumber
+    number
 ) {
 
     call.textContent =
         text;
 
     corner.textContent =
-        cornerNumber;
+        number;
 
     speak(text);
 
@@ -263,7 +296,29 @@ function engineerCall(
 
 function startLap() {
 
-    if (running) return;
+    /*
+       IMPORTANT:
+       Never start if already running.
+    */
+
+    if (running) {
+        return;
+    }
+
+    /*
+       Make absolutely sure the previous
+       lap cannot carry over.
+    */
+
+    if (
+        elapsed >= lapLength
+    ) {
+
+        elapsed = 0;
+
+        currentCorner = 0;
+
+    }
 
     running = true;
 
@@ -277,6 +332,13 @@ function startLap() {
     next.textContent =
         "Engineer active.";
 
+    /*
+       Clear any leftover speech from
+       the previous lap.
+    */
+
+    clearVoiceQueue();
+
     speak(
         "Green light. Push."
     );
@@ -289,7 +351,7 @@ function startLap() {
 
 
 /* =========================================
-   STOP LAP
+   STOP
 ========================================= */
 
 function stopLap() {
@@ -302,29 +364,19 @@ function stopLap() {
 
     animationFrame = null;
 
+    clearVoiceQueue();
+
     status.textContent =
         "STOPPED";
 
     next.textContent =
         "Press START when you're ready.";
 
-    if (
-        "speechSynthesis" in window
-    ) {
-
-        window.speechSynthesis.cancel();
-
-    }
-
-    voiceQueue = [];
-
-    voiceBusy = false;
-
 }
 
 
 /* =========================================
-   RESET LAP
+   RESET
 ========================================= */
 
 function resetLap() {
@@ -336,6 +388,8 @@ function resetLap() {
     );
 
     animationFrame = null;
+
+    clearVoiceQueue();
 
     elapsed = 0;
 
@@ -358,17 +412,73 @@ function resetLap() {
     corner.textContent =
         "—";
 
-    if (
-        "speechSynthesis" in window
-    ) {
+}
 
-        window.speechSynthesis.cancel();
 
-    }
+/* =========================================
+   FINISH LAP
+========================================= */
 
-    voiceQueue = [];
+function finishLap() {
 
-    voiceBusy = false;
+    /*
+       Stop the timer FIRST.
+    */
+
+    running = false;
+
+    cancelAnimationFrame(
+        animationFrame
+    );
+
+    animationFrame = null;
+
+    /*
+       Save the completed time.
+    */
+
+    const completedTime =
+        elapsed;
+
+    /*
+       Clear anything that was waiting
+       to be spoken.
+    */
+
+    clearVoiceQueue();
+
+    status.textContent =
+        "LAP COMPLETE";
+
+    call.textContent =
+        "LAP COMPLETE";
+
+    next.textContent =
+        "Press START for a new lap.";
+
+    /*
+       Reset the actual lap timer.
+    */
+
+    elapsed = 0;
+
+    currentCorner = 0;
+
+    updateTimer();
+
+    count.textContent =
+        "--";
+
+    corner.textContent =
+        "—";
+
+    /*
+       Speak ONLY the completion message.
+    */
+
+    speak(
+        "Lap complete."
+    );
 
 }
 
@@ -379,7 +489,9 @@ function resetLap() {
 
 function loop(timestamp) {
 
-    if (!running) return;
+    if (!running) {
+        return;
+    }
 
     elapsed =
         (
@@ -401,8 +513,8 @@ function loop(timestamp) {
             upcoming.text;
 
         /*
-           Trigger call slightly before
-           the reference point.
+           Call 1.5 seconds before
+           the corner reference point.
         */
 
         const triggerTime =
@@ -427,25 +539,14 @@ function loop(timestamp) {
     }
 
     /*
-       Lap finished
+       Finish exactly once.
     */
 
     if (
         elapsed >= lapLength
     ) {
 
-        running = false;
-
-        status.textContent =
-            "LAP COMPLETE";
-
-        speak(
-            "Lap complete."
-        );
-
-        cancelAnimationFrame(
-            animationFrame
-        );
+        finishLap();
 
         return;
     }
@@ -454,7 +555,6 @@ function loop(timestamp) {
         requestAnimationFrame(
             loop
         );
-
 }
 
 
@@ -467,7 +567,7 @@ paceButtons.forEach(
 
         button.addEventListener(
             "click",
-            () => {
+            function () {
 
                 lapLength =
                     Number(
@@ -475,13 +575,9 @@ paceButtons.forEach(
                     );
 
                 target.textContent =
-                    TARGET_LAPS[
+                    PACE_TIMES[
                         lapLength
                     ];
-
-                /*
-                   Highlight selected pace
-                */
 
                 paceButtons.forEach(
                     b => {
@@ -495,6 +591,22 @@ paceButtons.forEach(
                     "selected"
                 );
 
+                /*
+                   If changing pace before
+                   starting, make sure the
+                   timer is clean.
+                */
+
+                if (!running) {
+
+                    elapsed = 0;
+
+                    currentCorner = 0;
+
+                    updateTimer();
+
+                }
+
             }
         );
 
@@ -506,54 +618,76 @@ paceButtons.forEach(
    START BUTTON
 ========================================= */
 
-startButton.addEventListener(
-    "click",
-    startLap
-);
+if (startButton) {
+
+    startButton.addEventListener(
+        "click",
+        startLap
+    );
+
+}
 
 
 /* =========================================
    STOP BUTTON
 ========================================= */
 
-stopButton.addEventListener(
-    "click",
-    stopLap
-);
+if (stopButton) {
+
+    stopButton.addEventListener(
+        "click",
+        stopLap
+    );
+
+}
 
 
 /* =========================================
    TEST VOICE
 ========================================= */
 
-testButton.addEventListener(
-    "click",
-    () => {
+if (testButton) {
 
-        speak(
-            "Engineer voice check. " +
-            "Brake straight. " +
-            "Late apex. " +
-            "Early throttle."
-        );
+    testButton.addEventListener(
+        "click",
+        function () {
 
-        call.textContent =
-            "VOICE CHECK";
+            clearVoiceQueue();
 
-        status.textContent =
-            "VOICE TEST";
+            call.textContent =
+                "VOICE CHECK";
 
-    }
-);
+            status.textContent =
+                "VOICE TEST";
+
+            speak(
+                "Engineer voice check. " +
+                "Brake straight. " +
+                "Late apex. " +
+                "Early throttle."
+            );
+
+        }
+    );
+
+}
 
 
 /* =========================================
-   KEYBOARD CONTROLS
+   KEYBOARD
 ========================================= */
 
 document.addEventListener(
     "keydown",
-    event => {
+    function (event) {
+
+        if (
+            event.target.tagName === "INPUT" ||
+            event.target.tagName === "SELECT" ||
+            event.target.tagName === "TEXTAREA"
+        ) {
+            return;
+        }
 
         if (
             event.code === "Space"
@@ -574,8 +708,14 @@ document.addEventListener(
         }
 
         if (
-            event.key === "1"
+            event.key.toLowerCase() === "r"
         ) {
+
+            resetLap();
+
+        }
+
+        if (event.key === "1") {
 
             document
                 .querySelector(
@@ -585,9 +725,7 @@ document.addEventListener(
 
         }
 
-        if (
-            event.key === "2"
-        ) {
+        if (event.key === "2") {
 
             document
                 .querySelector(
@@ -597,9 +735,7 @@ document.addEventListener(
 
         }
 
-        if (
-            event.key === "3"
-        ) {
+        if (event.key === "3") {
 
             document
                 .querySelector(
@@ -609,23 +745,13 @@ document.addEventListener(
 
         }
 
-        if (
-            event.key === "4"
-        ) {
+        if (event.key === "4") {
 
             document
                 .querySelector(
                     '[data-lap="108"]'
                 )
                 ?.click();
-
-        }
-
-        if (
-            event.key.toLowerCase() === "r"
-        ) {
-
-            resetLap();
 
         }
 
@@ -637,8 +763,14 @@ document.addEventListener(
    INITIALIZE
 ========================================= */
 
+lapLength = 105;
+
+elapsed = 0;
+
+currentCorner = 0;
+
 target.textContent =
-    TARGET_LAPS[lapLength];
+    "1:45";
 
 lap.textContent =
     "0:00.0";
@@ -659,5 +791,5 @@ next.textContent =
     "Press START when you're ready.";
 
 console.log(
-    "Spa Race Engineer loaded successfully."
+    "Spa Race Engineer V7 loaded."
 );
