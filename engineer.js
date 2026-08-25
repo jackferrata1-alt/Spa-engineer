@@ -18,9 +18,10 @@ const PACE_TIMES = {
 ========================================= */
 
 const CORNERS = [
-    [1, 18.0, "Brake straight. Late apex. Early throttle."],
-    [2, 22.2, "Tight left. Prepare right."],
-    [3, 25.0, "Trail brake. Late apex. Power."],
+    const CORNERS = [
+    [1, 5.0, "Brake straight. Late apex. Early throttle."],
+    [2, 8.0, "Tight left. Prepare right."],
+    [3, 11.0, "Trail brake. Late apex. Power."],
     [4, 28.2, "Smooth left. Late apex."],
     [5, 31.2, "Carry speed. Early throttle."],
     [6, 34.8, "Light brake. Late apex."],
