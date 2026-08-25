@@ -42,7 +42,7 @@ const CORNERS = [
         number: 1,
         name: "TURN 1",
         time: 18.0,
-        call: "Turn 1, brake."
+        call: "Turn 1, brake straight, hit kurb, early throttle."
     },
     {
         number: 2,
