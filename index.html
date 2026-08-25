@@ -2,17 +2,10 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta
-        name="viewport"
-        content="width=device-width,initial-scale=1"
-    >
-
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Spa Race Engineer</title>
 
-    <link
-        rel="stylesheet"
-        href="style.css"
-    >
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
@@ -28,7 +21,6 @@
         <b id="status">READY</b>
     </header>
 
-
     <section class="hero">
 
         <small>TARGET LAP</small>
@@ -37,26 +29,25 @@
 
         <div class="paces">
 
-            <button data-lap="105">
+            <button type="button" onclick="setPace(105)">
                 1:45
             </button>
 
-            <button data-lap="106">
+            <button type="button" onclick="setPace(106)">
                 1:46
             </button>
 
-            <button data-lap="107">
+            <button type="button" onclick="setPace(107)">
                 1:47
             </button>
 
-            <button data-lap="108">
+            <button type="button" onclick="setPace(108)">
                 1:48
             </button>
 
         </div>
 
     </section>
-
 
     <section class="call">
 
@@ -70,49 +61,49 @@
 
     </section>
 
-
     <section class="stats">
 
         <div>
             LAP
-            <strong id="lap">
-                0:00.0
-            </strong>
+            <strong id="lap">0:00.0</strong>
         </div>
 
         <div>
             NEXT
-            <strong id="count">
-                --
-            </strong>
+            <strong id="count">--</strong>
         </div>
 
         <div>
             CORNER
-            <strong id="corner">
-                —
-            </strong>
+            <strong id="corner">—</strong>
         </div>
 
     </section>
 
-
     <div class="controls">
 
-        <button id="start">
+        <button
+            type="button"
+            id="start"
+            onclick="startLap()">
             START LAP
         </button>
 
-        <button id="stop">
+        <button
+            type="button"
+            id="stop"
+            onclick="stopLap()">
             STOP
         </button>
 
-        <button id="test">
+        <button
+            type="button"
+            id="test"
+            onclick="testVoice()">
             TEST VOICE
         </button>
 
     </div>
-
 
     <p class="note">
         Practice reference only.
@@ -123,7 +114,48 @@
 </main>
 
 
-<script src="engineer.js"></script>
+<script>
 
-</body>
-</html>
+/* =========================================
+   SPA ENGINEER — BUTTONS + PUSH LAP
+========================================= */
+
+let lapLength = 105;
+let running = false;
+let elapsed = 0;
+let startTime = 0;
+let animationFrame = null;
+let currentCorner = 0;
+
+const corners = [
+    [1,18.0,"Brake straight. Late apex. Early throttle."],
+    [2,22.2,"Tight left. Prepare right."],
+    [3,25.0,"Trail brake. Late apex. Power."],
+    [4,28.2,"Smooth left. Late apex."],
+    [5,31.2,"Carry speed. Early throttle."],
+    [6,34.8,"Light brake. Late apex."],
+    [7,38.0,"Stay tight. Early power."],
+    [8,42.0,"Brake straight. Late apex."],
+    [9,45.0,"Sacrifice entry. Maximize exit."],
+    [10,50.0,"Hard brake. Rotate. Power."],
+    [11,53.0,"Short brake. Carry speed."],
+    [12,56.5,"Don't over-slow. Early power."],
+    [13,60.0,"Late apex. Build throttle."],
+    [14,64.0,"Light brake. Patient rotation."],
+    [15,68.0,"Late apex. Get straight."],
+    [16,73.0,"Brake straight. Rotate. Exit."],
+    [17,76.5,"Carry speed. Stay smooth."],
+    [18,82.0,"Commit. Controlled throttle."],
+    [19,86.0,"Late apex. Full throttle."]
+];
+
+
+/* =========================================
+   DISPLAY
+========================================= */
+
+function formatTime(seconds) {
+
+    const minutes = Math.floor(seconds / 60);
+
+    const secs = Math.floor(seconds % 
